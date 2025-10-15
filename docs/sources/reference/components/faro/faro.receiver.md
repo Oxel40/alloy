@@ -55,13 +55,13 @@ The following strings are valid log line formats:
 
 You can use the following blocks with `faro.receiver`:
 
-| Block                                        | Description                                          | Required |
-|----------------------------------------------|------------------------------------------------------|----------|
-| [`output`][output]                           | Configures where to send collected telemetry data.   | yes      |
-| [`server`][server]                           | Configures the HTTP server.                          | no       |
-| `server` >  [`rate_limiting`][rate_limiting] | Configures rate limiting for the HTTP server.        | no       |
-| [`sourcemaps`][sourcemaps]                   | Configures sourcemap retrieval.                      | no       |
-| `sourcemaps` >  [`location`][location]       | Configures on-disk location for sourcemap retrieval. | no       |
+| Block                                        | Description                                        | Required |
+|----------------------------------------------|----------------------------------------------------|----------|
+| [`output`][output]                           | Configures where to send collected telemetry data. | yes      |
+| [`server`][server]                           | Configures the HTTP server.                        | no       |
+| `server` >  [`rate_limiting`][rate_limiting] | Configures rate limiting for the HTTP server.      | no       |
+| [`sourcemaps`][sourcemaps]                   | Configures sourcemap retrieval.                    | no       |
+| `sourcemaps` >  [`location`][location]       | Configures location for sourcemap retrieval.       | no       |
 
 The > symbol indicates deeper levels of nesting.
 For example, `sourcemaps` > `location` refers to a `location` block defined inside a `sourcemaps` block.
@@ -151,7 +151,7 @@ The `*` character indicates a wildcard.
 By default, sourcemap downloads are subject to a timeout of `"1s"`, specified by the `download_timeout` argument.
 Setting `download_timeout` to `"0s"` disables timeouts.
 
-To retrieve sourcemaps from disk instead of the network, specify one or more [`location` blocks][location].
+To retrieve sourcemaps from disk or another network location, specify one or more [`location` blocks][location].
 When `location` blocks are provided, they're checked first for sourcemaps before falling back to downloading.
 
 #### `location`
@@ -159,10 +159,10 @@ When `location` blocks are provided, they're checked first for sourcemaps before
 The `location` block declares a location where sourcemaps are stored on the filesystem.
 You can specify the `location` block multiple times to declare multiple locations where sourcemaps are stored.
 
-| Name                   | Type     | Description                                         | Default | Required |
-|------------------------|----------|-----------------------------------------------------|---------|----------|
-| `minified_path_prefix` | `string` | The prefix of the minified path sent from browsers. |         | yes      |
-| `path`                 | `string` | The path on disk where sourcemaps are stored.       |         | yes      |
+| Name                   | Type     | Description                                               | Default | Required |
+|------------------------|----------|-----------------------------------------------------------|---------|----------|
+| `minified_path_prefix` | `string` | The prefix of the minified path sent from browsers.       |         | yes      |
+| `path`                 | `string` | The path on disk or base url where sourcemaps are stored. |         | yes      |
 
 The `minified_path_prefix` argument determines the prefix of paths to JavaScript files, such as `http://example.com/`.
 The `path` argument then determines where to find the sourcemap for the file.
@@ -183,6 +183,36 @@ To look up the sourcemaps for a file hosted at `http://example.com/example.js`, 
 
 Optionally, the value for the `path` argument may contain `{{ .Release }}` as a template value, such as `/var/my-app/{{ .Release }}/build`.
 The template value is replaced with the release value provided by the [Faro Web App SDK][faro-sdk].
+
+When specifying a remote location, for example:
+
+```alloy
+location {
+    path                 = "http://foo.com/blob/sourcemaps/"
+    minified_path_prefix = "http://example.com/"
+}
+```
+
+The procedure for fetching the sourcemaps is the same as for a location block with a local path, except that the sourcemap
+is fetched from a remote http server. In the example above, the `faro.receiver` fetches the sourcemap for a file hosted at
+`http://example.com/example.js` by sending a GET request to `http://foo.com/blob/sourcemaps/example.js.map`.
+
+Multiple location blocks can be given:
+
+```alloy
+location {
+    path                 = "/var/my-app/build"
+    minified_path_prefix = "http://example.com/"
+}
+location {
+    path                 = "http://foo.com/blob/sourcemaps/"
+    minified_path_prefix = "http://example.com/"
+}
+```
+
+Then, the `faro.receiver` component will search through all locations for the sourcemap files. Local on-disk paths will
+take precedence over remote paths. For a file hosted at `http://example.com/example.js`, the `faro.receiver` would first check
+the path `/var/my-app/build/example.js.map`, and then try to fetch `http://foo.com/blob/sourcemaps/example.js.map`.
 
 ## Exported fields
 
